@@ -371,6 +371,8 @@ class MyFrame(wx.Frame):
 
     def do_the_plot( self, atop_file, target ):
 
+        pngFile = '%s_%s.png' % ( os.path.basename( atop_file ), target )
+
         p = Gnuplot.Gnuplot()
         p('set terminal png size 1200, 600')
         p('set lmargin 8')
@@ -380,17 +382,21 @@ class MyFrame(wx.Frame):
         p('set timefmt "%H:%M:%S"')
         p('set format x "%H:%M:%S"')
         p('set xdata time')
-        p('set output "%s_%s.png"' % (os.path.basename( atop_file) , target ))
+        p('set output "%s"' % pngFile ) 
         p('set xtics rotate')
         p('set title "CPU"')
         plotstr = ''
         for x in self.notebook_1.GetCurrentPage().GetChildren():
             #print x.GetId(), x.GetLabel()
-            if plotstr != '':
-                plotstr += ' , '
-            plotstr += '"/tmp/%s_%s.txt" using 5:%d title "%s" with lines' % ( os.path.basename(atop_file), target , x.GetId(), x.GetLabel() )     
+            if x.IsChecked() is True:
+                if plotstr != '':
+                    plotstr += ' , '
+                plotstr += '"/tmp/%s_%s.txt" using 5:%d title "%s" with lines' % ( os.path.basename(atop_file), target , x.GetId(), x.GetLabel() )     
 
         p( 'plot ' + plotstr )
+
+        time.sleep(1)
+        os.system('display ' + pngFile )
 
 
     def generate_report(self, event):  # wxGlade: MyFrame.<event_handler>
