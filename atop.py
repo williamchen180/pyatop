@@ -9,14 +9,7 @@ import pprint
 import os
 import time
 import wx
-
-
-def signal_handler(signal, frame):
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler )
-
-
+import Gnuplot
 
 
 # begin wxGlade: extracode
@@ -130,7 +123,6 @@ class MyFrame(wx.Frame):
 
         # My code starts from here...
 
-
         self.Bind( wx.EVT_CLOSE, self.frame_close, self )
 
         self.text_ctrl_1.SetLabel( 'text_ctrl_1' )
@@ -138,7 +130,6 @@ class MyFrame(wx.Frame):
         self.text_ctrl_3.SetLabel( 'text_ctrl_3' )
         self.text_ctrl_4.SetLabel( 'text_ctrl_4' )
         self.text_ctrl_5.SetLabel( 'text_ctrl_5' )
-
 
         self.setting_file = '.pyatop'
 
@@ -159,13 +150,14 @@ class MyFrame(wx.Frame):
         fileA_not_ready = False
         fileB_not_ready = False
         for x in self.parsable:
-            if os.path.isfile( '/tmp/%s_%s.txt' % (x, os.path.basename( self.fileA ) ) ) is False:
+            if os.path.isfile( '/tmp/%s_%s.txt' % (os.path.basename( self.fileA ), x ) ) is False:
+                print '/tmp/%s_%s.txt no exist' % (os.path.basename( self.fileA ), x )
                 fileA_not_ready = True
                 break
         if fileA_not_ready is True:
             self.fileAStatus.SetValue( 'not loaded' )
         for x in self.parsable:
-            if os.path.isfile( '/tmp/%s_%s.txt' % (x, os.path.basename( self.fileB ) ) ) is False:
+            if os.path.isfile( '/tmp/%s_%s.txt' % (os.path.basename( self.fileB ), x ) ) is False:
                 fileB_not_ready = True
                 break
         if fileB_not_ready is True:
@@ -307,37 +299,35 @@ class MyFrame(wx.Frame):
         # end wxGlade
 
     def load_fileA(self, event):  # wxGlade: MyFrame.<event_handler>
-	self.fileA = self.fileATextCtrl.GetValue()
-	if os.path.isfile( self.fileA ) is False:
-		self.status( '%s not exist' % self.fileA )
-		return
-	basename = os.path.basename( self.fileA )
-	for x in self.parsable:
-		os.system( 'atop -r %s -P %s | grep %s | sed \'1d\' > /tmp/%s_%s.txt' % (self.fileA, x, x, basename, x ) )
+        self.fileA = self.fileATextCtrl.GetValue()
+        if os.path.isfile( self.fileA ) is False:
+            self.status( '%s not exist' % self.fileA )
+            return
+        basename = os.path.basename( self.fileA )
+        for x in self.parsable:
+            os.system( 'atop -r %s -P %s | grep %s | sed \'1d\' > /tmp/%s_%s.txt' % (self.fileA, x, x, basename, x ) )
 
-	for x in self.eths:
-		os.system( 'grep upper /tmp/NET_%s.txt | sed \'1d\' > /tmp/%s_NET_%s.txt' % ( basename, x, basename ) )
+        for x in self.eths:
+            os.system( 'grep upper /tmp/%s_NET.txt | sed \'1d\' > /tmp/%s_NET_%s.txt' % ( basename, basename, x ) )
 
-	self.fileAStatus.SetValue('loaded')
+        self.fileAStatus.SetValue('loaded')
 	
         event.Skip()
 
     def load_fileB(self, event):  # wxGlade: MyFrame.<event_handler>
-	self.fileB = self.fileBTextCtrl.GetValue()
-	if os.path.isfile( self.fileB ) is False:
-		self.status( '%s not exist' % self.fileB )
-		return
-	basename = os.path.basename( self.fileB )
-	for x in self.parsable:
-		os.system( 'atop -r %s -P %s | grep %s | sed \'1d\' > /tmp/%s_%s.txt' % (self.fileB, x, x, basename, x ) )
-	for x in self.eths:
-		os.system( 'grep upper /tmp/NET_%s.txt | sed \'1d\' > /tmp/%s_NET_%s.txt' % ( basename, x, basename ) )
+        self.fileB = self.fileBTextCtrl.GetValue()
+        if os.path.isfile( self.fileB ) is False:
+            self.status( '%s not exist' % self.fileB )
+            return
+        basename = os.path.basename( self.fileB )
+        for x in self.parsable:
+            os.system( 'atop -r %s -P %s | grep %s | sed \'1d\' > /tmp/%s_%s.txt' % (self.fileA, x, x, basename, x ) )
+        for x in self.eths:
+            os.system( 'grep upper /tmp/%s_NET.txt | sed \'1d\' > /tmp/%s_NET_%s.txt' % ( basename, basename, x ) )
 
-	self.fileBStatus.SetValue('loaded')
+        self.fileBStatus.SetValue('loaded')
         event.Skip()
 
-    def generate_report(self, event):  # wxGlade: MyFrame.<event_handler>
-        event.Skip()
 
     def visitall( self, obj, load = False ):
         if hasattr( obj, 'GetChildren' ) is True:
@@ -371,12 +361,48 @@ class MyFrame(wx.Frame):
 
 
     def save_settings_handler(self, event):  # wxGlade: MyFrame.<event_handler>
+        print 'save settings..'
         self.do_save()
         event.Skip()
 
     def frame_close( self, event ):
         self.do_save()
         self.Destroy()
+
+    def do_the_plot( self, atop_file, target ):
+
+        p = Gnuplot.Gnuplot()
+        p('set terminal png size 1200, 600')
+        p('set lmargin 8')
+        p('set rmargin 4')
+        p('set tmargin 3')
+        p('set bmargin 8')
+        p('set timefmt "%H:%M:%S"')
+        p('set format x "%H:%M:%S"')
+        p('set xdata time')
+        p('set output "%s_%s.png"' % (os.path.basename( atop_file) , target ))
+        p('set xtics rotate')
+        p('set title "CPU"')
+        plotstr = ''
+        for x in self.notebook_1.GetCurrentPage().GetChildren():
+            #print x.GetId(), x.GetLabel()
+            if plotstr != '':
+                plotstr += ' , '
+            plotstr += '"/tmp/%s_%s.txt" using 5:%d title "%s" with lines' % ( os.path.basename(atop_file), target , x.GetId(), x.GetLabel() )     
+
+        p( 'plot ' + plotstr )
+
+
+    def generate_report(self, event):  # wxGlade: MyFrame.<event_handler>
+
+        target = self.notebook_1.GetPageText( self.notebook_1.GetSelection() )
+
+        if self.fileACheckBox.IsChecked() is True and os.path.isfile( self.fileATextCtrl.GetValue() ):
+            self.do_the_plot( self.fileATextCtrl.GetValue(), target ) 
+        if self.fileBCheckBox.IsChecked() is True and os.path.isfile( self.fileBTextCtrl.GetValue() ):
+            self.do_the_plot( self.fileBTextCtrl.GetValue(), target ) 
+
+        event.Skip()
 
 # end of class MyFrame
 if __name__ == "__main__":
@@ -386,3 +412,4 @@ if __name__ == "__main__":
     app.SetTopWindow(frame_1)
     frame_1.Show()
     app.MainLoop()
+
